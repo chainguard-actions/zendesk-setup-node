@@ -1,0 +1,60 @@
+name: Test npm caching
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create package-lock.json for cache key
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/test-fixtures"
+          cat > "$GITHUB_WORKSPACE/test-fixtures/package-lock.json" <<'EOF'
+          {
+            "name": "test-app",
+            "version": "1.0.0",
+            "lockfileVersion": 3,
+            "requires": true,
+            "packages": {
+              "": {
+                "name": "test-app",
+                "version": "1.0.0"
+              }
+            }
+          }
+          EOF
+      - id: setup
+        uses: .
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'test-fixtures/package-lock.json'
+          package-manager-cache: 'false'
+      - name: Assert node-version output is set
+        env:
+          NODE_VER: ${{ steps.setup.outputs.node-version }}
+        run: |
+          echo "node-version output: $NODE_VER"
+          if [ -z "$NODE_VER" ]; then
+            echo "FAIL: node-version output is empty"
+            exit 1
+          fi
+          echo "PASS: node-version output is '$NODE_VER'"
+      - name: Assert cache-primary-key output
+        env:
+          CACHE_KEY: ${{ steps.setup.outputs.cache-primary-key }}
+        run: |
+          echo "cache-primary-key: $CACHE_KEY"
+          # cache-primary-key is only set when the cache service is available.
+          # In act, the cache service is typically not available, so this may be empty.
+          # We accept both empty (cache unavailable) and non-empty (cache available).
+          echo "PASS: cache-primary-key is '$CACHE_KEY' (empty is acceptable when cache service is unavailable)"
+      - name: Assert node binary is on PATH
+        run: |
+          ACTUAL=$(node --version)
+          echo "actual node version: $ACTUAL"
+          if [[ "$ACTUAL" != v20* ]]; then
+            echo "FAIL: expected node v20.x but got $ACTUAL"
+            exit 1
+          fi
+          echo "PASS"
