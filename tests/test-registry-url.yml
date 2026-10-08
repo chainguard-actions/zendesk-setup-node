@@ -1,0 +1,94 @@
+name: Test registry-url input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Ensure Node.js 24 runtime is available for the action
+        run: |
+          current=$(node --version 2>/dev/null || echo "v0.0.0")
+          major=$(echo "$current" | cut -d. -f1 | tr -d 'v')
+          echo "Current node: $current (major: $major)"
+          if [ "${major:-0}" -lt 24 ] 2>/dev/null; then
+            echo "Node.js < 24 detected, installing Node.js 24 via NodeSource..."
+            curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - 2>&1 || true
+            sudo apt-get install -y nodejs 2>&1 || true
+          fi
+          echo "Node version after setup: $(node --version)"
+      - id: setup
+        uses: .
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Assert node-version output is set
+        env:
+          NODE_VER: ${{ steps.setup.outputs.node-version }}
+        run: |
+          echo "node-version output: $NODE_VER"
+          if [ -z "$NODE_VER" ]; then
+            echo "FAIL: node-version output is empty"
+            exit 1
+          fi
+          echo "PASS: node-version output is '$NODE_VER'"
+      - name: Assert node binary is on PATH
+        run: |
+          ACTUAL=$(node --version)
+          echo "node --version: $ACTUAL"
+          if [[ "$ACTUAL" != v20* ]]; then
+            echo "FAIL: expected node v20.x, got $ACTUAL"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Assert .npmrc is configured with registry
+        run: |
+          echo "NPM_CONFIG_USERCONFIG: $NPM_CONFIG_USERCONFIG"
+          echo "RUNNER_TEMP: $RUNNER_TEMP"
+
+          found=false
+
+          # Check the file pointed to by NPM_CONFIG_USERCONFIG (set by the action)
+          if [ -n "$NPM_CONFIG_USERCONFIG" ] && [ -f "$NPM_CONFIG_USERCONFIG" ]; then
+            echo "Checking NPM_CONFIG_USERCONFIG: $NPM_CONFIG_USERCONFIG"
+            cat "$NPM_CONFIG_USERCONFIG"
+            if grep -q "registry.npmjs.org" "$NPM_CONFIG_USERCONFIG"; then
+              echo "PASS: registry found in $NPM_CONFIG_USERCONFIG"
+              found=true
+            fi
+          fi
+
+          # Check $RUNNER_TEMP/.npmrc (where the action writes by default)
+          if [ "$found" = "false" ] && [ -n "$RUNNER_TEMP" ] && [ -f "$RUNNER_TEMP/.npmrc" ]; then
+            echo "Checking $RUNNER_TEMP/.npmrc"
+            cat "$RUNNER_TEMP/.npmrc"
+            if grep -q "registry.npmjs.org" "$RUNNER_TEMP/.npmrc"; then
+              echo "PASS: registry found in $RUNNER_TEMP/.npmrc"
+              found=true
+            fi
+          fi
+
+          # Check workspace .npmrc
+          if [ "$found" = "false" ] && [ -f "$GITHUB_WORKSPACE/.npmrc" ]; then
+            echo "Checking $GITHUB_WORKSPACE/.npmrc"
+            cat "$GITHUB_WORKSPACE/.npmrc"
+            if grep -q "registry.npmjs.org" "$GITHUB_WORKSPACE/.npmrc"; then
+              echo "PASS: registry found in $GITHUB_WORKSPACE/.npmrc"
+              found=true
+            fi
+          fi
+
+          # Check home .npmrc
+          if [ "$found" = "false" ] && [ -f "$HOME/.npmrc" ]; then
+            echo "Checking $HOME/.npmrc"
+            cat "$HOME/.npmrc"
+            if grep -q "registry.npmjs.org" "$HOME/.npmrc"; then
+              echo "PASS: registry found in $HOME/.npmrc"
+              found=true
+            fi
+          fi
+
+          if [ "$found" = "false" ]; then
+            echo "FAIL: .npmrc with registry.npmjs.org not found in any expected location"
+            exit 1
+          fi

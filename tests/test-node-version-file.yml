@@ -1,0 +1,45 @@
+name: Test node-version-file input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Ensure Node.js 24 runtime is available for the action
+        run: |
+          current=$(node --version 2>/dev/null || echo "v0.0.0")
+          major=$(echo "$current" | cut -d. -f1 | tr -d 'v')
+          echo "Current node: $current (major: $major)"
+          if [ "${major:-0}" -lt 24 ] 2>/dev/null; then
+            echo "Node.js < 24 detected, installing Node.js 24 via NodeSource..."
+            curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - 2>&1 || true
+            sudo apt-get install -y nodejs 2>&1 || true
+          fi
+          echo "Node version after setup: $(node --version)"
+      - name: Create .nvmrc file
+        run: |
+          echo "18" > "$GITHUB_WORKSPACE/.nvmrc"
+      - id: setup
+        uses: .
+        with:
+          node-version-file: '.nvmrc'
+      - name: Assert node-version output is set
+        env:
+          NODE_VER: ${{ steps.setup.outputs.node-version }}
+        run: |
+          echo "node-version output: $NODE_VER"
+          if [ -z "$NODE_VER" ]; then
+            echo "FAIL: node-version output is empty"
+            exit 1
+          fi
+          echo "PASS: node-version output is '$NODE_VER'"
+      - name: Assert node binary matches version from file
+        run: |
+          ACTUAL=$(node --version)
+          echo "node --version: $ACTUAL"
+          if [[ "$ACTUAL" != v18* ]]; then
+            echo "FAIL: expected node v18.x, got $ACTUAL"
+            exit 1
+          fi
+          echo "PASS"
