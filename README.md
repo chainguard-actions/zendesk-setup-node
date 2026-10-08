@@ -9,6 +9,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
 | v7.0.0 | [`v7.0.0`](https://github.com/chainguard-actions/zendesk-setup-node/tree/v7.0.0) | [`8207627`](https://github.com/zendesk/setup-node/commit/820762786026740c76f36085b0efc47a31fe5020) |
+| v7.1.0 | [`v7.1.0`](https://github.com/chainguard-actions/zendesk-setup-node/tree/v7.1.0) | [`949feb2`](https://github.com/zendesk/setup-node/commit/949feb2413d6458794dcd2491c4babbbce0c15c1) |
 
 ## Privacy
 
